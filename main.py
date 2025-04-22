@@ -49,16 +49,6 @@ def scrape_article_content(article_url):
         title = soup.select_one("h1")
     title_text = title.get_text(strip=True) if title else "No Title"
 
-    # Try to extract the date
-    date_element = (
-        soup.select_one("div.date")
-        or soup.select_one("span.date")
-        or soup.select_one("div.artDate")
-    )
-    date_str = None
-    if date_element:
-        date_str = date_element.get_text(strip=True)
-
     # Extract main content
     content_div = soup.select_one("article.detailsContent")
     if not content_div:
@@ -66,30 +56,44 @@ def scrape_article_content(article_url):
             "div.article-body"
         )  # Fallback to previous selector
 
-    content_text = ""
+    cleaned_paragraphs = []
     if content_div:
         paragraphs = content_div.select("p")
-        content_text = "\n".join(p.get_text(strip=True) for p in paragraphs)
+        for i, p in enumerate(paragraphs):
+            text = p.get_text(strip=True)
 
-    # Extract topic tags if available
-    tags = []
-    topics_section = soup.select_one("div.topic") or soup.select_one("ul.tags")
-    if topics_section:
-        tag_links = topics_section.select("a")
-        tags = [
-            tag.get_text(strip=True) for tag in tag_links if tag.get_text(strip=True)
-        ]
+            # Skip "Baca Juga" paragraphs
+            if text == "Baca Juga":
+                continue
 
-    # If no tags were found, add default "tips keuangan" tag
-    if not tags:
-        tags = ["tips keuangan"]
+            # Remove potential prefixes like "Bisnis.com,JAKARTA - " or "Bisnis.com, " from the first paragraph
+            if i == 0:
+                prefixes_to_remove = [
+                    "Bisnis.com,JAKARTA - ",
+                    "Bisnis.com,JAKARTA-",
+                    "Bisnis.com,JAKARTA -- ",
+                    "Bisnis.com,JAKARTA--",
+                    "Bisnis.com, ",
+                    "Bisnis com, JAKARTA — ",
+                    "JAKARTA — ",
+                    "JAKARTA—",
+                    "JAKARTA--",
+                ]
+                for prefix in prefixes_to_remove:
+                    if text.startswith(prefix):
+                        text = text.replace(prefix, "", 1).strip()
+                        break  # Stop checking once a prefix is found and removed
+
+            # Only add non-empty paragraphs
+            if text:
+                cleaned_paragraphs.append(text)
+
+    content_text = "\n".join(cleaned_paragraphs)
 
     return {
         "title": title_text,
         "url": article_url,
         "content": content_text,
-        "date": date_str,
-        "tags": tags,
         "source": "bisnis.com",
     }
 
@@ -135,8 +139,6 @@ def save_for_rag(articles, output_file="bisnis_tips_keuangan_data.json"):
             "metadata": {
                 "source": article["source"],
                 "url": article["url"],
-                "date": article["date"],
-                "tags": article["tags"],
             },
         }
         rag_data.append(rag_document)
@@ -165,8 +167,6 @@ def main():
         for article in articles[:3]:
             print(f"Title: {article['title']}")
             print(f"URL: {article['url']}")
-            print(f"Date: {article['date']}")
-            print(f"Tags: {', '.join(article['tags'])}")
             print(f"Content Preview: {article['content'][:100]}...")
             print("-" * 50)
 
