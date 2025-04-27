@@ -47,7 +47,7 @@ def scrape_article_content(article_url):
     title = soup.select_one("h1.article-title")
     if not title:
         title = soup.select_one("h1")
-    title_text = title.get_text(strip=True) if title else "No Title"
+    title_text = title.get_text(strip=True).lower() if title else "no title"
 
     # Extract main content
     content_div = soup.select_one("article.detailsContent")
@@ -66,29 +66,30 @@ def scrape_article_content(article_url):
             if text == "Baca Juga":
                 continue
 
-            # Remove potential prefixes like "Bisnis.com,JAKARTA - " or "Bisnis.com, " from the first paragraph
-            if i == 0:
-                prefixes_to_remove = [
-                    "Bisnis.com,JAKARTA - ",
-                    "Bisnis.com,JAKARTA-",
-                    "Bisnis.com,JAKARTA -- ",
-                    "Bisnis.com,JAKARTA--",
-                    "Bisnis.com, ",
-                    "Bisnis com, JAKARTA — ",
-                    "JAKARTA — ",
-                    "JAKARTA—",
-                    "JAKARTA--",
-                ]
-                for prefix in prefixes_to_remove:
-                    if text.startswith(prefix):
-                        text = text.replace(prefix, "", 1).strip()
-                        break  # Stop checking once a prefix is found and removed
+            # Remove potential prefixes like "Bisnis.com,JAKARTA - " or "JAKARTA — " from *any* paragraph start
+            prefixes_to_remove = [
+                "Bisnis.com,JAKARTA - ",
+                "Bisnis.com,JAKARTA-",
+                "Bisnis.com,JAKARTA -- ",
+                "Bisnis.com,JAKARTA--",
+                "Bisnis.com,JAKARTA — ",
+                "Bisnis.com, ",
+                "Bisnis com, JAKARTA — ",
+                "JAKARTA — ",
+                "JAKARTA—",
+                "JAKARTA - ",
+                "JAKARTA--",
+            ]
+            for prefix in prefixes_to_remove:
+                if text.startswith(prefix):
+                    text = text.replace(prefix, "", 1).strip()
+                    break  # Stop checking once a prefix is found and removed
 
             # Only add non-empty paragraphs
             if text:
                 cleaned_paragraphs.append(text)
 
-    content_text = "\n".join(cleaned_paragraphs)
+    content_text = "\n".join(cleaned_paragraphs).lower()
 
     return {
         "title": title_text,
